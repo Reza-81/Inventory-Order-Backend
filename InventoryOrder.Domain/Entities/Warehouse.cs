@@ -1,4 +1,4 @@
-using System;
+using InventoryOrder.Domain.ValueObjects;
 
 namespace InventoryOrder.Domain.Entities;
 
@@ -7,15 +7,12 @@ public class Warehouse
     public Guid Id { get; private set; }
     public string Code { get; private set; } = null!;
     public string Name { get; private set; } = null!;
-    public string Address { get; private set; } = null!;
+    public Address Address { get; private set; } = null!;
     public bool IsActive { get; private set; }
 
-    /// <summary>
-    /// For EF Core
-    /// </summary>
-    public Warehouse() {}
+    public Warehouse() { }
 
-    private Warehouse(string code, string name, string address, bool isActive)
+    private Warehouse(string code, string name, Address address, bool isActive)
     {
         Id = Guid.NewGuid();
         Code = code;
@@ -24,26 +21,14 @@ public class Warehouse
         IsActive = isActive;
     }
 
-    /// <summary>
-    /// Factory Method
-    /// </summary>
-    /// <param name="code"></param>
-    /// <param name="name"></param>
-    /// <param name="address"></param>
-    /// <param name="isActive"></param>
-    /// <returns></returns>
-    /// <exception cref="ArgumentException"></exception>
-    public static Warehouse Create(string code, string name, string address, bool isActive)
+    public static Warehouse Create(string code, string name, Address address, bool isActive = true)
     {
         if (string.IsNullOrWhiteSpace(code))
             throw new ArgumentException("Code is required.", nameof(code));
-
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Name is required.", nameof(name));
+        ArgumentNullException.ThrowIfNull(address);
 
-        if (string.IsNullOrWhiteSpace(address))
-            throw new ArgumentException("Address is required.", nameof(address));
-
-        return new Warehouse(code, name, address, isActive);
+        return new Warehouse(code.Trim().ToUpperInvariant(), name.Trim(), address, isActive);
     }
 }

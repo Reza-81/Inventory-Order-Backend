@@ -1,8 +1,8 @@
 namespace InventoryOrder.Domain.Enums;
 
-public enum UniteOfMeasure
+public enum UnitOfMeasure
 {
-    Kg=1,
-    Liter=2,
-    Box=3,
+    Kg = 1,
+    Liter = 2,
+    Box = 3,
 }
