@@ -16,6 +16,9 @@ public sealed class TransactionBehavior<TRequest, TResponse>(
     {
         return transactionManager.ExecuteAsync(
             _ => next(cancellationToken),
+            request is IConcurrencyRetryCommand<TResponse> retryCommand
+                ? retryCommand.MaxConcurrencyRetries
+                : 0,
             cancellationToken);
     }
 }

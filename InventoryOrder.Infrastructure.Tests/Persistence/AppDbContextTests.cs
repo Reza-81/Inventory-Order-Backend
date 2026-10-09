@@ -107,6 +107,7 @@ public sealed class AppDbContextTests
         Assert.NotNull(context.Model.FindEntityType(typeof(Shipment)));
         Assert.NotNull(context.Model.FindEntityType(typeof(ShipmentLine)));
         Assert.NotNull(context.Model.FindEntityType(typeof(InventoryTransaction)));
+        Assert.NotNull(context.Model.FindEntityType(typeof(IdempotencyRecord)));
     }
 
     private static AppDbContext CreateContext(string databaseName)

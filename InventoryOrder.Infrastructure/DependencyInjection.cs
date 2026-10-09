@@ -33,22 +33,31 @@ public static class DependencyInjection
     {
         public async Task<TResponse> ExecuteAsync<TResponse>(
             Func<CancellationToken, Task<TResponse>> operation,
+            int maxConcurrencyRetries = 0,
             CancellationToken cancellationToken = default)
         {
-            await using var transaction = await dbContext.Database
-                .BeginTransactionAsync(cancellationToken);
+            for (var attempt = 0; ; attempt++)
+            {
+                await using var transaction = await dbContext.Database
+                    .BeginTransactionAsync(cancellationToken);
 
-            try
-            {
-                var response = await operation(cancellationToken);
-                await dbContext.SaveChangesAsync(cancellationToken);
-                await transaction.CommitAsync(cancellationToken);
-                return response;
-            }
-            catch
-            {
-                await transaction.RollbackAsync(cancellationToken);
-                throw;
+                try
+                {
+                    var response = await operation(cancellationToken);
+                    await dbContext.SaveChangesAsync(cancellationToken);
+                    await transaction.CommitAsync(cancellationToken);
+                    return response;
+                }
+                catch (DbUpdateConcurrencyException) when (attempt < maxConcurrencyRetries)
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    dbContext.ChangeTracker.Clear();
+                }
+                catch
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    throw;
+                }
             }
         }
     }

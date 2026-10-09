@@ -14,7 +14,16 @@ public interface IApplicationDbContext
     IQueryable<ShipmentLine> ShipmentLines { get; }
     IQueryable<InventoryTransaction> InventoryTransactions { get; }
 
+    Task<Product?> FindProductByIdAsync(Guid productId, CancellationToken cancellationToken = default);
+    Task<Product?> FindProductBySkuAsync(string sku, CancellationToken cancellationToken = default);
+    Task<Warehouse?> FindWarehouseByIdAsync(Guid warehouseId, CancellationToken cancellationToken = default);
+    Task<Customer?> FindCustomerByIdAsync(Guid customerId, CancellationToken cancellationToken = default);
+    Task<StockItem?> FindStockItemAsync(Guid productId, Guid warehouseId, CancellationToken cancellationToken = default);
+    Task<SalesOrder?> FindSalesOrderWithLinesAsync(Guid orderId, CancellationToken cancellationToken = default);
+    Task<IdempotencyRecord?> FindIdempotencyRecordAsync(string key, CancellationToken cancellationToken = default);
+
     void Add<TEntity>(TEntity entity) where TEntity : class;
+    void Remove<TEntity>(TEntity entity) where TEntity : class;
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

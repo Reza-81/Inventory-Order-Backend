@@ -18,6 +18,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<ShipmentLine> ShipmentLines => Set<ShipmentLine>();
     public DbSet<InventoryTransaction> InventoryTransactions =>
         Set<InventoryTransaction>();
+    public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
 
     IQueryable<Product> IApplicationDbContext.Products => Products;
     IQueryable<Warehouse> IApplicationDbContext.Warehouses => Warehouses;
@@ -28,7 +29,22 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     IQueryable<Shipment> IApplicationDbContext.Shipments => Shipments;
     IQueryable<ShipmentLine> IApplicationDbContext.ShipmentLines => ShipmentLines;
     IQueryable<InventoryTransaction> IApplicationDbContext.InventoryTransactions => InventoryTransactions;
+    Task<Product?> IApplicationDbContext.FindProductByIdAsync(Guid productId, CancellationToken cancellationToken) =>
+        Products.SingleOrDefaultAsync(product => product.Id == productId, cancellationToken);
+    Task<Product?> IApplicationDbContext.FindProductBySkuAsync(string sku, CancellationToken cancellationToken) =>
+        Products.SingleOrDefaultAsync(product => product.Sku.Value == sku, cancellationToken);
+    Task<Warehouse?> IApplicationDbContext.FindWarehouseByIdAsync(Guid warehouseId, CancellationToken cancellationToken) =>
+        Warehouses.SingleOrDefaultAsync(warehouse => warehouse.Id == warehouseId, cancellationToken);
+    Task<Customer?> IApplicationDbContext.FindCustomerByIdAsync(Guid customerId, CancellationToken cancellationToken) =>
+        Customers.SingleOrDefaultAsync(customer => customer.Id == customerId, cancellationToken);
+    Task<StockItem?> IApplicationDbContext.FindStockItemAsync(Guid productId, Guid warehouseId, CancellationToken cancellationToken) =>
+        StockItems.SingleOrDefaultAsync(stock => stock.ProductId == productId && stock.WarehouseId == warehouseId, cancellationToken);
+    Task<SalesOrder?> IApplicationDbContext.FindSalesOrderWithLinesAsync(Guid orderId, CancellationToken cancellationToken) =>
+        SalesOrders.Include(order => order.Lines).SingleOrDefaultAsync(order => order.Id == orderId, cancellationToken);
+    Task<IdempotencyRecord?> IApplicationDbContext.FindIdempotencyRecordAsync(string key, CancellationToken cancellationToken) =>
+        IdempotencyRecords.SingleOrDefaultAsync(record => record.Key == key, cancellationToken);
     void IApplicationDbContext.Add<TEntity>(TEntity entity) => Add(entity);
+    void IApplicationDbContext.Remove<TEntity>(TEntity entity) => Remove(entity);
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
