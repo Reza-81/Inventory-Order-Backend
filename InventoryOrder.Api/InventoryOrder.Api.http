@@ -1,6 +1,59 @@
-@InventoryOrder.Api_HostAddress = http://localhost:5190
+@baseUrl = http://localhost:5190
+@customerId = aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa
+@warehouseId = bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb
+@productId = cccccccc-cccc-cccc-cccc-cccccccccccc
+@orderId = dddddddd-dddd-dddd-dddd-dddddddddddd
+@orderLineId = eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee
 
-GET {{InventoryOrder.Api_HostAddress}}/weatherforecast/
+### Ping
+GET {{baseUrl}}/ping?message=hello
 Accept: application/json
 
-###
+### Place an order
+# Replace customerId and warehouseId with IDs that exist in your database.
+# Copy the returned orderId into @orderId for the shipment request.
+POST {{baseUrl}}/orders
+Content-Type: application/json
+
+{
+  "customerId": "{{customerId}}",
+  "lines": [
+    {
+      "sku": "DEMO-001",
+      "warehouseId": "{{warehouseId}}",
+      "quantity": 2
+    }
+  ],
+  "idempotencyKey": "http-place-order-001"
+}
+
+### Adjust stock
+# Replace productId and warehouseId with IDs that exist in your database.
+POST {{baseUrl}}/inventory/adjustments
+Content-Type: application/json
+
+{
+  "warehouseId": "{{warehouseId}}",
+  "productId": "{{productId}}",
+  "delta": 10,
+  "reason": "Initial stock received",
+  "idempotencyKey": "http-adjust-stock-001"
+}
+
+### Ship an order
+# Replace orderId and orderLineId with values returned by the order workflow.
+POST {{baseUrl}}/orders/{{orderId}}/shipments
+Content-Type: application/json
+
+{
+  "shipmentNumber": "SHIP-HTTP-001",
+  "lines": [
+    {
+      "salesOrderLineId": "{{orderLineId}}",
+      "quantity": 1
+    }
+  ],
+  "carrier": "UPS",
+  "trackingNumber": "TRACK-HTTP-001",
+  "idempotencyKey": "http-ship-order-001"
+}
