@@ -96,6 +96,7 @@ public sealed class AppDbContext(
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
         SetStockConcurrencyTokens();
+        ApplyAuditInformation();
         return base.SaveChanges(acceptAllChangesOnSuccess);
     }
 
@@ -104,6 +105,7 @@ public sealed class AppDbContext(
         CancellationToken cancellationToken = default)
     {
         SetStockConcurrencyTokens();
+        ApplyAuditInformation();
         return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
     }
 
