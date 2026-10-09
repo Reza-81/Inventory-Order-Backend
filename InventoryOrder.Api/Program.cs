@@ -1,3 +1,6 @@
+using InventoryOrder.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -5,15 +8,24 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddOpenApi();
 
 var mysqlConnectionString =
-    builder.Configuration.GetConnectionString("MySql");
+    builder.Configuration.GetConnectionString("MySql")
+    ?? throw new InvalidOperationException(
+        "ConnectionStrings:MySql is missing from configuration.");
 
 var redisConnectionString =
-    builder.Configuration.GetConnectionString("Redis");
+    builder.Configuration.GetConnectionString("Redis")
+    ?? throw new InvalidOperationException(
+        "ConnectionStrings:Redis is missing from configuration.");
+
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseMySql(
+        mysqlConnectionString,
+        ServerVersion.AutoDetect(mysqlConnectionString)));
 
 builder.Services
     .AddHealthChecks()
-    .AddMySql(mysqlConnectionString!, name: "mysql")
-    .AddRedis(redisConnectionString!, name: "redis");
+    .AddMySql(mysqlConnectionString, name: "mysql")
+    .AddRedis(redisConnectionString, name: "redis");
 
 var app = builder.Build();
 
