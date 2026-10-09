@@ -19,6 +19,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<InventoryTransaction> InventoryTransactions =>
         Set<InventoryTransaction>();
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
+    public DbSet<ApplicationUser> Users => Set<ApplicationUser>();
+    public DbSet<UserWarehouse> UserWarehouses => Set<UserWarehouse>();
 
     IQueryable<Product> IApplicationDbContext.Products => Products;
     IQueryable<Warehouse> IApplicationDbContext.Warehouses => Warehouses;
@@ -29,6 +31,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     IQueryable<Shipment> IApplicationDbContext.Shipments => Shipments;
     IQueryable<ShipmentLine> IApplicationDbContext.ShipmentLines => ShipmentLines;
     IQueryable<InventoryTransaction> IApplicationDbContext.InventoryTransactions => InventoryTransactions;
+    IQueryable<ApplicationUser> IApplicationDbContext.Users => Users;
+    IQueryable<UserWarehouse> IApplicationDbContext.UserWarehouses => UserWarehouses;
     Task<Product?> IApplicationDbContext.FindProductByIdAsync(Guid productId, CancellationToken cancellationToken) =>
         Products.SingleOrDefaultAsync(product => product.Id == productId, cancellationToken);
     Task<Product?> IApplicationDbContext.FindProductBySkuAsync(string sku, CancellationToken cancellationToken) =>
@@ -43,6 +47,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
         SalesOrders.Include(order => order.Lines).SingleOrDefaultAsync(order => order.Id == orderId, cancellationToken);
     Task<IdempotencyRecord?> IApplicationDbContext.FindIdempotencyRecordAsync(string key, CancellationToken cancellationToken) =>
         IdempotencyRecords.SingleOrDefaultAsync(record => record.Key == key, cancellationToken);
+    Task<ApplicationUser?> IApplicationDbContext.FindUserByUsernameAsync(string username, CancellationToken cancellationToken) =>
+        Users.SingleOrDefaultAsync(user => user.Username == username, cancellationToken);
+    Task<bool> IApplicationDbContext.UserHasWarehouseAccessAsync(Guid userId, Guid warehouseId, CancellationToken cancellationToken) =>
+        UserWarehouses.AnyAsync(assignment => assignment.UserId == userId && assignment.WarehouseId == warehouseId, cancellationToken);
     void IApplicationDbContext.Add<TEntity>(TEntity entity) => Add(entity);
     void IApplicationDbContext.Remove<TEntity>(TEntity entity) => Remove(entity);
 

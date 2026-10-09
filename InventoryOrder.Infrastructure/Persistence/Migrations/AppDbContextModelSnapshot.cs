@@ -22,6 +22,43 @@ namespace InventoryOrder.Infrastructure.Persistence.Migrations
 
             MySqlModelBuilderExtensions.AutoIncrementColumns(modelBuilder);
 
+            modelBuilder.Entity("InventoryOrder.Domain.Entities.ApplicationUser", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<string>("Username")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Username")
+                        .IsUnique();
+
+                    b.ToTable("Users", (string)null);
+                });
+
             modelBuilder.Entity("InventoryOrder.Domain.Entities.Customer", b =>
                 {
                     b.Property<Guid>("Id")
@@ -348,6 +385,21 @@ namespace InventoryOrder.Infrastructure.Persistence.Migrations
                     b.ToTable("StockItems", (string)null);
                 });
 
+            modelBuilder.Entity("InventoryOrder.Domain.Entities.UserWarehouse", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid>("WarehouseId")
+                        .HasColumnType("char(36)");
+
+                    b.HasKey("UserId", "WarehouseId");
+
+                    b.HasIndex("WarehouseId");
+
+                    b.ToTable("UserWarehouses", (string)null);
+                });
+
             modelBuilder.Entity("InventoryOrder.Domain.Entities.Warehouse", b =>
                 {
                     b.Property<Guid>("Id")
@@ -622,6 +674,25 @@ namespace InventoryOrder.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("InventoryOrder.Domain.Entities.UserWarehouse", b =>
+                {
+                    b.HasOne("InventoryOrder.Domain.Entities.ApplicationUser", "User")
+                        .WithMany("WarehouseAssignments")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("InventoryOrder.Domain.Entities.Warehouse", "Warehouse")
+                        .WithMany()
+                        .HasForeignKey("WarehouseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+
+                    b.Navigation("Warehouse");
+                });
+
             modelBuilder.Entity("InventoryOrder.Domain.Entities.Warehouse", b =>
                 {
                     b.OwnsOne("InventoryOrder.Domain.ValueObjects.Address", "Address", b1 =>
@@ -673,6 +744,11 @@ namespace InventoryOrder.Infrastructure.Persistence.Migrations
 
                     b.Navigation("Address")
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("InventoryOrder.Domain.Entities.ApplicationUser", b =>
+                {
+                    b.Navigation("WarehouseAssignments");
                 });
 
             modelBuilder.Entity("InventoryOrder.Domain.Entities.SalesOrder", b =>

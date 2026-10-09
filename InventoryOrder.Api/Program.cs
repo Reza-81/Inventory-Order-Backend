@@ -1,14 +1,21 @@
 using InventoryOrder.Application;
 using InventoryOrder.Application.Common.Exceptions;
+using InventoryOrder.Application.Common.Interfaces;
+using InventoryOrder.Application.Features.Auth.Login;
 using InventoryOrder.Application.Features.Inventory.AdjustStock;
 using InventoryOrder.Application.Features.Orders.PlaceOrder;
 using InventoryOrder.Application.Features.Orders.ShipOrder;
 using InventoryOrder.Application.Features.Ping;
 using InventoryOrder.Infrastructure;
+using InventoryOrder.Infrastructure.Persistence;
+using InventoryOrder.Infrastructure.Persistence.Seed;
 using FluentValidation;
 using MediatR;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,6 +23,28 @@ var builder = WebApplication.CreateBuilder(args);
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 builder.Services.AddProblemDetails();
+
+var jwtSigningKey = builder.Configuration["Jwt:SigningKey"]
+    ?? throw new InvalidOperationException("Jwt:SigningKey is missing from configuration.");
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = builder.Configuration["Jwt:Issuer"] ?? "InventoryOrder.Api",
+            ValidateAudience = true,
+            ValidAudience = builder.Configuration["Jwt:Audience"] ?? "InventoryOrder.Client",
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSigningKey)),
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromSeconds(30)
+        };
+    });
+builder.Services.AddAuthorizationBuilder()
+    .AddPolicy("CanAdjustStock", policy =>
+        policy.RequireAuthenticatedUser().RequireRole("Admin", "WarehouseManager"));
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
@@ -36,6 +65,16 @@ builder.Services
     .AddRedis(redisConnectionString, name: "redis");
 
 var app = builder.Build();
+
+if (app.Configuration.GetValue("Database:Seed", false))
+{
+    await using var scope = app.Services.CreateAsyncScope();
+    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    await dbContext.Database.MigrateAsync();
+    await DatabaseSeeder.SeedAsync(
+        dbContext,
+        scope.ServiceProvider.GetRequiredService<IPasswordService>());
+}
 
 app.UseExceptionHandler(exceptionApp =>
 {
@@ -74,6 +113,17 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapPost("/auth/login", async (
+    LoginCommand command,
+    ISender sender,
+    CancellationToken cancellationToken) =>
+{
+    var response = await sender.Send(command, cancellationToken);
+    return Results.Ok(response);
+}).AllowAnonymous();
 
 app.MapGet("/ping", async (
     string message,
@@ -94,7 +144,7 @@ app.MapPost("/orders", async (
 {
     var response = await sender.Send(command, cancellationToken);
     return Results.Created($"/orders/{response.OrderId}", response);
-});
+}).RequireAuthorization();
 
 app.MapPost("/inventory/adjustments", async (
     AdjustStockCommand command,
@@ -103,7 +153,7 @@ app.MapPost("/inventory/adjustments", async (
 {
     var response = await sender.Send(command, cancellationToken);
     return Results.Ok(response);
-});
+}).RequireAuthorization("CanAdjustStock");
 
 app.MapPost("/orders/{orderId:guid}/shipments", async (
     Guid orderId,
@@ -121,7 +171,7 @@ app.MapPost("/orders/{orderId:guid}/shipments", async (
 
     var response = await sender.Send(command, cancellationToken);
     return Results.Created($"/shipments/{response.ShipmentId}", response);
-});
+}).RequireAuthorization();
 
 var summaries = new[]
 {

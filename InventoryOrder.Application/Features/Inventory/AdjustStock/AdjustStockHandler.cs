@@ -6,17 +6,27 @@ using MediatR;
 
 namespace InventoryOrder.Application.Features.Inventory.AdjustStock;
 
-public sealed class AdjustStockHandler(IApplicationDbContext dbContext)
+public sealed class AdjustStockHandler(
+    IApplicationDbContext dbContext,
+    ICurrentUser? currentUser = null,
+    IWarehouseAccessChecker? warehouseAccessChecker = null)
     : IRequestHandler<AdjustStockCommand, AdjustStockResponse>
 {
     public async Task<AdjustStockResponse> Handle(
         AdjustStockCommand request,
         CancellationToken cancellationToken)
     {
+        if (currentUser is not null && !currentUser.IsAuthenticated)
+            throw new ConflictException("Authentication is required to adjust stock.");
+
         _ = await dbContext.FindProductByIdAsync(request.ProductId, cancellationToken)
             ?? throw new NotFoundException("Product was not found.");
         _ = await dbContext.FindWarehouseByIdAsync(request.WarehouseId, cancellationToken)
             ?? throw new NotFoundException("Warehouse was not found.");
+
+        if (warehouseAccessChecker is not null &&
+            !await warehouseAccessChecker.CanAccessAsync(request.WarehouseId, cancellationToken))
+            throw new ConflictException("You do not have access to this warehouse.");
 
         var stockItem = await dbContext.FindStockItemAsync(
             request.ProductId,

@@ -13,6 +13,8 @@ public interface IApplicationDbContext
     IQueryable<Shipment> Shipments { get; }
     IQueryable<ShipmentLine> ShipmentLines { get; }
     IQueryable<InventoryTransaction> InventoryTransactions { get; }
+    IQueryable<ApplicationUser> Users { get; }
+    IQueryable<UserWarehouse> UserWarehouses { get; }
 
     Task<Product?> FindProductByIdAsync(Guid productId, CancellationToken cancellationToken = default);
     Task<Product?> FindProductBySkuAsync(string sku, CancellationToken cancellationToken = default);
@@ -21,6 +23,8 @@ public interface IApplicationDbContext
     Task<StockItem?> FindStockItemAsync(Guid productId, Guid warehouseId, CancellationToken cancellationToken = default);
     Task<SalesOrder?> FindSalesOrderWithLinesAsync(Guid orderId, CancellationToken cancellationToken = default);
     Task<IdempotencyRecord?> FindIdempotencyRecordAsync(string key, CancellationToken cancellationToken = default);
+    Task<ApplicationUser?> FindUserByUsernameAsync(string username, CancellationToken cancellationToken = default);
+    Task<bool> UserHasWarehouseAccessAsync(Guid userId, Guid warehouseId, CancellationToken cancellationToken = default);
 
     void Add<TEntity>(TEntity entity) where TEntity : class;
     void Remove<TEntity>(TEntity entity) where TEntity : class;

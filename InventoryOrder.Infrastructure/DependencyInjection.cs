@@ -1,5 +1,6 @@
 using InventoryOrder.Application.Common.Interfaces;
 using InventoryOrder.Infrastructure.Persistence;
+using InventoryOrder.Infrastructure.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,6 +25,11 @@ public static class DependencyInjection
         services.AddScoped<IApplicationDbContext>(
             provider => provider.GetRequiredService<AppDbContext>());
         services.AddScoped<ITransactionManager, EfTransactionManager>();
+        services.AddHttpContextAccessor();
+        services.AddScoped<ICurrentUser, HttpCurrentUser>();
+        services.AddScoped<IPasswordService, PasswordService>();
+        services.AddScoped<IAccessTokenService, JwtAccessTokenService>();
+        services.AddScoped<IWarehouseAccessChecker, WarehouseAccessChecker>();
 
         return services;
     }
