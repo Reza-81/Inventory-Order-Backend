@@ -10,20 +10,56 @@ using InventoryOrder.Application.Features.Ping;
 using InventoryOrder.Infrastructure;
 using InventoryOrder.Infrastructure.Persistence;
 using InventoryOrder.Infrastructure.Persistence.Seed;
+using InventoryOrder.Api.Infrastructure;
 using FluentValidation;
 using MediatR;
-using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using System.Threading.RateLimiting;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Host.UseSerilog((context, _, loggerConfiguration) => loggerConfiguration
+    .ReadFrom.Configuration(context.Configuration)
+    .Enrich.FromLogContext()
+    .WriteTo.Console());
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<ApiExceptionHandler>();
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => resource.AddService("InventoryOrder.Api"))
+    .WithTracing(tracing => tracing
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddOtlpExporter());
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("auth", context => RateLimitPartition.GetFixedWindowLimiter(
+        context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 5,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0
+        }));
+    options.AddPolicy("writes", context => RateLimitPartition.GetFixedWindowLimiter(
+        context.User.Identity?.Name ?? context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 60,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0
+        }));
+});
 
 var jwtSigningKey = builder.Configuration["Jwt:SigningKey"]
     ?? throw new InvalidOperationException("Jwt:SigningKey is missing from configuration.");
@@ -77,34 +113,8 @@ if (app.Configuration.GetValue("Database:Seed", false))
         scope.ServiceProvider.GetRequiredService<IPasswordService>());
 }
 
-app.UseExceptionHandler(exceptionApp =>
-{
-    exceptionApp.Run(async context =>
-    {
-        var exception = context.Features.Get<IExceptionHandlerFeature>()?.Error;
-        var statusCode = exception switch
-        {
-            ValidationException => StatusCodes.Status400BadRequest,
-            NotFoundException => StatusCodes.Status404NotFound,
-            ConflictException => StatusCodes.Status409Conflict,
-            DbUpdateConcurrencyException => StatusCodes.Status409Conflict,
-            ArgumentException or InvalidOperationException => StatusCodes.Status400BadRequest,
-            _ => StatusCodes.Status500InternalServerError
-        };
-
-        await Results.Problem(
-            statusCode: statusCode,
-            title: statusCode == StatusCodes.Status500InternalServerError
-                ? "An unexpected error occurred."
-                : exception is DbUpdateConcurrencyException
-                    ? "The resource was changed by another request."
-                : exception?.Message,
-            detail: statusCode == StatusCodes.Status500InternalServerError
-                ? null
-                : exception?.Message)
-            .ExecuteAsync(context);
-    });
-});
+app.UseExceptionHandler();
+app.UseMiddleware<CorrelationIdMiddleware>();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -114,6 +124,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -124,7 +135,7 @@ app.MapPost("/auth/login", async (
 {
     var response = await sender.Send(command, cancellationToken);
     return Results.Ok(response);
-}).AllowAnonymous();
+}).AllowAnonymous().RequireRateLimiting("auth");
 
 app.MapGet("/ping", async (
     string message,
@@ -145,7 +156,7 @@ app.MapPost("/orders", async (
 {
     var response = await sender.Send(command, cancellationToken);
     return Results.Created($"/orders/{response.OrderId}", response);
-}).RequireAuthorization();
+}).RequireAuthorization().RequireRateLimiting("writes");
 
 app.MapPost("/inventory/adjustments", async (
     AdjustStockCommand command,
@@ -154,7 +165,7 @@ app.MapPost("/inventory/adjustments", async (
 {
     var response = await sender.Send(command, cancellationToken);
     return Results.Ok(response);
-}).RequireAuthorization("CanAdjustStock");
+}).RequireAuthorization("CanAdjustStock").RequireRateLimiting("writes");
 
 app.MapGet("/warehouses/{warehouseId:guid}/stock", async (
     Guid warehouseId,
@@ -163,7 +174,7 @@ app.MapGet("/warehouses/{warehouseId:guid}/stock", async (
 {
     var response = await sender.Send(new GetStockLevelsQuery(warehouseId), cancellationToken);
     return Results.Ok(response);
-}).RequireAuthorization();
+}).RequireAuthorization().RequireRateLimiting("writes");
 
 app.MapPost("/orders/{orderId:guid}/shipments", async (
     Guid orderId,
@@ -181,7 +192,7 @@ app.MapPost("/orders/{orderId:guid}/shipments", async (
 
     var response = await sender.Send(command, cancellationToken);
     return Results.Created($"/shipments/{response.ShipmentId}", response);
-}).RequireAuthorization();
+}).RequireAuthorization().RequireRateLimiting("writes");
 
 var summaries = new[]
 {
