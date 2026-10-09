@@ -3,13 +3,15 @@ using InventoryOrder.Application.Common.Interfaces;
 using InventoryOrder.Domain.Entities;
 using InventoryOrder.Domain.Enums;
 using MediatR;
+using InventoryOrder.Application.Common.Notifications;
 
 namespace InventoryOrder.Application.Features.Inventory.AdjustStock;
 
 public sealed class AdjustStockHandler(
     IApplicationDbContext dbContext,
     ICurrentUser? currentUser = null,
-    IWarehouseAccessChecker? warehouseAccessChecker = null)
+    IWarehouseAccessChecker? warehouseAccessChecker = null,
+    IPublisher? publisher = null)
     : IRequestHandler<AdjustStockCommand, AdjustStockResponse>
 {
     public async Task<AdjustStockResponse> Handle(
@@ -44,6 +46,8 @@ public sealed class AdjustStockHandler(
             request.Reason,
             referenceType: nameof(AdjustStockCommand),
             referenceId: stockItem.Id));
+        if (publisher is not null)
+            await publisher.Publish(new StockChangedNotification(request.WarehouseId), cancellationToken);
 
         return new AdjustStockResponse(
             stockItem.ProductId,

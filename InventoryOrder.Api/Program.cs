@@ -3,6 +3,7 @@ using InventoryOrder.Application.Common.Exceptions;
 using InventoryOrder.Application.Common.Interfaces;
 using InventoryOrder.Application.Features.Auth.Login;
 using InventoryOrder.Application.Features.Inventory.AdjustStock;
+using InventoryOrder.Application.Features.Inventory.GetStockLevels;
 using InventoryOrder.Application.Features.Orders.PlaceOrder;
 using InventoryOrder.Application.Features.Orders.ShipOrder;
 using InventoryOrder.Application.Features.Ping;
@@ -154,6 +155,15 @@ app.MapPost("/inventory/adjustments", async (
     var response = await sender.Send(command, cancellationToken);
     return Results.Ok(response);
 }).RequireAuthorization("CanAdjustStock");
+
+app.MapGet("/warehouses/{warehouseId:guid}/stock", async (
+    Guid warehouseId,
+    ISender sender,
+    CancellationToken cancellationToken) =>
+{
+    var response = await sender.Send(new GetStockLevelsQuery(warehouseId), cancellationToken);
+    return Results.Ok(response);
+}).RequireAuthorization();
 
 app.MapPost("/orders/{orderId:guid}/shipments", async (
     Guid orderId,

@@ -1,6 +1,7 @@
 using InventoryOrder.Application.Common.Interfaces;
 using InventoryOrder.Infrastructure.Persistence;
 using InventoryOrder.Infrastructure.Security;
+using InventoryOrder.Infrastructure.Caching;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -30,6 +31,10 @@ public static class DependencyInjection
         services.AddScoped<IPasswordService, PasswordService>();
         services.AddScoped<IAccessTokenService, JwtAccessTokenService>();
         services.AddScoped<IWarehouseAccessChecker, WarehouseAccessChecker>();
+        var redisConnectionString = configuration.GetConnectionString("Redis")
+            ?? throw new InvalidOperationException("ConnectionStrings:Redis is missing from configuration.");
+        services.AddStackExchangeRedisCache(options => options.Configuration = redisConnectionString);
+        services.AddScoped<ICacheService, RedisCacheService>();
 
         return services;
     }

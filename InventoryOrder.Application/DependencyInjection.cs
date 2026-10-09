@@ -18,6 +18,7 @@ public static class DependencyInjection
             configuration.AddOpenBehavior(typeof(ValidationBehavior<,>));
             configuration.AddOpenBehavior(typeof(TransactionBehavior<,>));
             configuration.AddOpenBehavior(typeof(IdempotencyBehavior<,>));
+            configuration.AddOpenBehavior(typeof(CacheBehavior<,>));
         });
 
         return services;

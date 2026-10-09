@@ -26,9 +26,16 @@ public interface IApplicationDbContext
     Task<IdempotencyRecord?> FindIdempotencyRecordAsync(string key, CancellationToken cancellationToken = default);
     Task<ApplicationUser?> FindUserByUsernameAsync(string username, CancellationToken cancellationToken = default);
     Task<bool> UserHasWarehouseAccessAsync(Guid userId, Guid warehouseId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyCollection<StockLevel>> GetStockLevelsByWarehouseAsync(Guid warehouseId, CancellationToken cancellationToken = default);
 
     void Add<TEntity>(TEntity entity) where TEntity : class;
     void Remove<TEntity>(TEntity entity) where TEntity : class;
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
+
+public sealed record StockLevel(
+    Guid ProductId,
+    string Sku,
+    decimal QuantityOnHand,
+    decimal QuantityReserved);

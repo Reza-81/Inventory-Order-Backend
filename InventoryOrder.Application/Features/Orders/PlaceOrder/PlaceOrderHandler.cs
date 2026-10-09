@@ -2,10 +2,11 @@ using InventoryOrder.Application.Common.Exceptions;
 using InventoryOrder.Application.Common.Interfaces;
 using InventoryOrder.Domain.Entities;
 using MediatR;
+using InventoryOrder.Application.Common.Notifications;
 
 namespace InventoryOrder.Application.Features.Orders.PlaceOrder;
 
-public sealed class PlaceOrderHandler(IApplicationDbContext dbContext)
+public sealed class PlaceOrderHandler(IApplicationDbContext dbContext, IPublisher? publisher = null)
     : IRequestHandler<PlaceOrderCommand, PlaceOrderResponse>
 {
     public async Task<PlaceOrderResponse> Handle(
@@ -73,6 +74,12 @@ public sealed class PlaceOrderHandler(IApplicationDbContext dbContext)
 
         order.Confirm();
         dbContext.Add(order);
+
+        if (publisher is not null)
+        {
+            foreach (var warehouseId in resolvedLines.Select(line => line.StockItem.WarehouseId).Distinct())
+                await publisher.Publish(new StockChangedNotification(warehouseId), cancellationToken);
+        }
 
         return new PlaceOrderResponse(
             order.Id,

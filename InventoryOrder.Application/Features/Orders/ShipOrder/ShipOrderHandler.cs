@@ -3,10 +3,11 @@ using InventoryOrder.Application.Common.Interfaces;
 using InventoryOrder.Domain.Entities;
 using InventoryOrder.Domain.Enums;
 using MediatR;
+using InventoryOrder.Application.Common.Notifications;
 
 namespace InventoryOrder.Application.Features.Orders.ShipOrder;
 
-public sealed class ShipOrderHandler(IApplicationDbContext dbContext)
+public sealed class ShipOrderHandler(IApplicationDbContext dbContext, IPublisher? publisher = null)
     : IRequestHandler<ShipOrderCommand, ShipOrderResponse>
 {
     public async Task<ShipOrderResponse> Handle(
@@ -63,6 +64,15 @@ public sealed class ShipOrderHandler(IApplicationDbContext dbContext)
         shipment.MarkShipped();
         order.UpdateShipmentStatus();
         dbContext.Add(shipment);
+
+        if (publisher is not null)
+        {
+            foreach (var warehouseId in order.Lines
+                         .Where(line => request.Lines.Any(requested => requested.SalesOrderLineId == line.Id))
+                         .Select(line => line.WarehouseId)
+                         .Distinct())
+                await publisher.Publish(new StockChangedNotification(warehouseId), cancellationToken);
+        }
 
         return new ShipOrderResponse(
             shipment.Id,

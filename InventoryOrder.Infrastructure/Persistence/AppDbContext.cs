@@ -57,6 +57,24 @@ public sealed class AppDbContext(
         Users.SingleOrDefaultAsync(user => user.Username == username, cancellationToken);
     Task<bool> IApplicationDbContext.UserHasWarehouseAccessAsync(Guid userId, Guid warehouseId, CancellationToken cancellationToken) =>
         UserWarehouses.AnyAsync(assignment => assignment.UserId == userId && assignment.WarehouseId == warehouseId, cancellationToken);
+    async Task<IReadOnlyCollection<StockLevel>> IApplicationDbContext.GetStockLevelsByWarehouseAsync(
+        Guid warehouseId,
+        CancellationToken cancellationToken)
+    {
+        return await StockItems
+            .AsNoTracking()
+            .Where(stock => stock.WarehouseId == warehouseId)
+            .Join(
+                Products.AsNoTracking(),
+                stock => stock.ProductId,
+                product => product.Id,
+                (stock, product) => new StockLevel(
+                    stock.ProductId,
+                    product.Sku.Value,
+                    stock.QuantityOnHand,
+                    stock.QuantityReserved))
+            .ToListAsync(cancellationToken);
+    }
     void IApplicationDbContext.Add<TEntity>(TEntity entity) => Add(entity);
     void IApplicationDbContext.Remove<TEntity>(TEntity entity) => Remove(entity);
 
