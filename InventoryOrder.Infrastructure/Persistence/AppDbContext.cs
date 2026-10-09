@@ -2,10 +2,14 @@ using InventoryOrder.Domain.Entities;
 using InventoryOrder.Application.Common.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Cryptography;
+using System.Text.Json;
+using InventoryOrder.Domain.Common;
 
 namespace InventoryOrder.Infrastructure.Persistence;
 
-public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
+public sealed class AppDbContext(
+    DbContextOptions<AppDbContext> options,
+    ICurrentUser? currentUser = null)
     : DbContext(options), IApplicationDbContext
 {
     public DbSet<Product> Products => Set<Product>();
@@ -21,6 +25,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
     public DbSet<ApplicationUser> Users => Set<ApplicationUser>();
     public DbSet<UserWarehouse> UserWarehouses => Set<UserWarehouse>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     IQueryable<Product> IApplicationDbContext.Products => Products;
     IQueryable<Warehouse> IApplicationDbContext.Warehouses => Warehouses;
@@ -33,6 +38,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     IQueryable<InventoryTransaction> IApplicationDbContext.InventoryTransactions => InventoryTransactions;
     IQueryable<ApplicationUser> IApplicationDbContext.Users => Users;
     IQueryable<UserWarehouse> IApplicationDbContext.UserWarehouses => UserWarehouses;
+    IQueryable<AuditLog> IApplicationDbContext.AuditLogs => AuditLogs;
     Task<Product?> IApplicationDbContext.FindProductByIdAsync(Guid productId, CancellationToken cancellationToken) =>
         Products.SingleOrDefaultAsync(product => product.Id == productId, cancellationToken);
     Task<Product?> IApplicationDbContext.FindProductBySkuAsync(string sku, CancellationToken cancellationToken) =>
@@ -57,6 +63,16 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes()
+                     .Where(entityType => typeof(IAuditable).IsAssignableFrom(entityType.ClrType)))
+        {
+            var entity = modelBuilder.Entity(entityType.ClrType);
+            entity.Property(nameof(IAuditable.CreatedAt)).IsRequired();
+            entity.Property(nameof(IAuditable.CreatedBy));
+            entity.Property(nameof(IAuditable.UpdatedAt));
+            entity.Property(nameof(IAuditable.UpdatedBy));
+        }
     }
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
@@ -82,5 +98,56 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             RandomNumberGenerator.Fill(token);
             entry.Property(nameof(StockItem.RowVersion)).CurrentValue = token;
         }
+    }
+
+    private void ApplyAuditInformation()
+    {
+        var timestamp = DateTimeOffset.UtcNow;
+        var actorId = currentUser?.UserId;
+        var auditEntries = ChangeTracker.Entries()
+            .Where(entry => entry.Entity is IAuditable &&
+                            entry.Entity is not AuditLog &&
+                            entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
+            .ToList();
+
+        foreach (var entry in auditEntries)
+        {
+            var auditable = (IAuditable)entry.Entity;
+            if (entry.State == EntityState.Added)
+            {
+                auditable.SetCreatedAudit(timestamp, actorId);
+            }
+            else if (entry.State == EntityState.Modified)
+            {
+                auditable.SetUpdatedAudit(timestamp, actorId);
+            }
+
+            var oldValues = entry.State == EntityState.Added
+                ? null
+                : JsonSerializer.Serialize(entry.Properties.ToDictionary(
+                    property => property.Metadata.Name,
+                    property => property.OriginalValue));
+            var newValues = entry.State == EntityState.Deleted
+                ? null
+                : JsonSerializer.Serialize(entry.Properties.ToDictionary(
+                    property => property.Metadata.Name,
+                    property => property.CurrentValue));
+
+            AuditLogs.Add(AuditLog.Create(
+                entry.Metadata.ClrType.Name,
+                GetEntityId(entry),
+                entry.State.ToString(),
+                oldValues,
+                newValues,
+                actorId));
+        }
+    }
+
+    private static string GetEntityId(Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry entry)
+    {
+        var key = entry.Metadata.FindPrimaryKey()?.Properties.FirstOrDefault();
+        return key is null
+            ? entry.Entity.GetHashCode().ToString()
+            : Convert.ToString(entry.Property(key.Name).CurrentValue ?? entry.Property(key.Name).OriginalValue) ?? "unknown";
     }
 }

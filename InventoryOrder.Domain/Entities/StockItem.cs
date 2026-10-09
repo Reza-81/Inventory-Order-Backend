@@ -1,6 +1,8 @@
+using InventoryOrder.Domain.Common;
+
 namespace InventoryOrder.Domain.Entities;
 
-public class StockItem
+public class StockItem : IAuditable
 {
     public Guid Id { get; private set; }
     public Guid ProductId { get; private set; }
@@ -8,6 +10,10 @@ public class StockItem
     public decimal QuantityOnHand { get; private set; }
     public decimal QuantityReserved { get; private set; }
     public byte[] RowVersion { get; private set; } = [];
+    public DateTimeOffset CreatedAt { get; private set; }
+    public Guid? CreatedBy { get; private set; }
+    public DateTimeOffset? UpdatedAt { get; private set; }
+    public Guid? UpdatedBy { get; private set; }
 
     public StockItem() { }
 
@@ -16,6 +22,7 @@ public class StockItem
         Id = Guid.NewGuid();
         ProductId = productId;
         WarehouseId = warehouseId;
+        CreatedAt = DateTimeOffset.UtcNow;
     }
 
     public static StockItem Create(Guid productId, Guid warehouseId)
@@ -26,6 +33,20 @@ public class StockItem
             throw new ArgumentException("Warehouse ID is required.", nameof(warehouseId));
 
         return new StockItem(productId, warehouseId);
+    }
+
+    public void SetCreatedAudit(DateTimeOffset timestamp, Guid? actorId)
+    {
+        CreatedAt = timestamp;
+        CreatedBy = actorId;
+        UpdatedAt = timestamp;
+        UpdatedBy = actorId;
+    }
+
+    public void SetUpdatedAudit(DateTimeOffset timestamp, Guid? actorId)
+    {
+        UpdatedAt = timestamp;
+        UpdatedBy = actorId;
     }
 
     public void Reserve(decimal quantity)

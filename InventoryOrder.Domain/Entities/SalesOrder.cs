@@ -1,8 +1,9 @@
 using InventoryOrder.Domain.Enums;
+using InventoryOrder.Domain.Common;
 
 namespace InventoryOrder.Domain.Entities;
 
-public class SalesOrder
+public class SalesOrder : IAuditable
 {
     private readonly List<SalesOrderLine> _lines = [];
 
@@ -14,6 +15,10 @@ public class SalesOrder
     public decimal TotalAmount { get; private set; }
     public string Currency { get; private set; } = null!;
     public IReadOnlyCollection<SalesOrderLine> Lines => _lines.AsReadOnly();
+    public DateTimeOffset CreatedAt { get; private set; }
+    public Guid? CreatedBy { get; private set; }
+    public DateTimeOffset? UpdatedAt { get; private set; }
+    public Guid? UpdatedBy { get; private set; }
 
     public SalesOrder() { }
 
@@ -25,6 +30,7 @@ public class SalesOrder
         Status = OrderStatus.Draft;
         OrderDate = DateTimeOffset.UtcNow;
         Currency = currency;
+        CreatedAt = OrderDate;
     }
 
     public static SalesOrder Create(string orderNumber, Guid customerId, string currency = "USD")
@@ -49,6 +55,20 @@ public class SalesOrder
             throw new InvalidOperationException("The order line currency must match the order currency.");
         _lines.Add(line);
         TotalAmount += line.LineTotal;
+    }
+
+    public void SetCreatedAudit(DateTimeOffset timestamp, Guid? actorId)
+    {
+        CreatedAt = timestamp;
+        CreatedBy = actorId;
+        UpdatedAt = timestamp;
+        UpdatedBy = actorId;
+    }
+
+    public void SetUpdatedAudit(DateTimeOffset timestamp, Guid? actorId)
+    {
+        UpdatedAt = timestamp;
+        UpdatedBy = actorId;
     }
 
     public void Confirm()

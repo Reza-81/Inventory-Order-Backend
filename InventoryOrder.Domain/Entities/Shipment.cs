@@ -1,8 +1,9 @@
 using InventoryOrder.Domain.Enums;
+using InventoryOrder.Domain.Common;
 
 namespace InventoryOrder.Domain.Entities;
 
-public class Shipment
+public class Shipment : IAuditable
 {
     private readonly List<ShipmentLine> _lines = [];
 
@@ -14,6 +15,10 @@ public class Shipment
     public string? TrackingNumber { get; private set; }
     public ShipmentStatus Status { get; private set; }
     public IReadOnlyCollection<ShipmentLine> Lines => _lines.AsReadOnly();
+    public DateTimeOffset CreatedAt { get; private set; }
+    public Guid? CreatedBy { get; private set; }
+    public DateTimeOffset? UpdatedAt { get; private set; }
+    public Guid? UpdatedBy { get; private set; }
 
     public Shipment() { }
 
@@ -25,6 +30,7 @@ public class Shipment
         Carrier = carrier?.Trim();
         TrackingNumber = trackingNumber?.Trim();
         Status = ShipmentStatus.Pending;
+        CreatedAt = DateTimeOffset.UtcNow;
     }
 
     public static Shipment Create(string shipmentNumber, Guid salesOrderId, string? carrier = null, string? trackingNumber = null)
@@ -45,6 +51,20 @@ public class Shipment
         if (line.ShipmentId != Id)
             throw new InvalidOperationException("The shipment line belongs to a different shipment.");
         _lines.Add(line);
+    }
+
+    public void SetCreatedAudit(DateTimeOffset timestamp, Guid? actorId)
+    {
+        CreatedAt = timestamp;
+        CreatedBy = actorId;
+        UpdatedAt = timestamp;
+        UpdatedBy = actorId;
+    }
+
+    public void SetUpdatedAudit(DateTimeOffset timestamp, Guid? actorId)
+    {
+        UpdatedAt = timestamp;
+        UpdatedBy = actorId;
     }
 
     public void MarkShipped()

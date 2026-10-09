@@ -1,8 +1,9 @@
 using InventoryOrder.Domain.ValueObjects;
+using InventoryOrder.Domain.Common;
 
 namespace InventoryOrder.Domain.Entities;
 
-public class Customer
+public class Customer : IAuditable
 {
     public Guid Id { get; private set; }
     public string Name { get; private set; } = null!;
@@ -11,6 +12,10 @@ public class Customer
     public Address BillingAddress { get; private set; } = null!;
     public Address? ShippingAddress { get; private set; }
     public bool IsActive { get; private set; }
+    public DateTimeOffset CreatedAt { get; private set; }
+    public Guid? CreatedBy { get; private set; }
+    public DateTimeOffset? UpdatedAt { get; private set; }
+    public Guid? UpdatedBy { get; private set; }
 
     public Customer() { }
 
@@ -23,6 +28,7 @@ public class Customer
         BillingAddress = billingAddress;
         ShippingAddress = shippingAddress;
         IsActive = isActive;
+        CreatedAt = DateTimeOffset.UtcNow;
     }
 
     public static Customer Create(string name, string email, Address billingAddress, Address? shippingAddress = null, string? phone = null, bool isActive = true)
@@ -34,5 +40,19 @@ public class Customer
         ArgumentNullException.ThrowIfNull(billingAddress);
 
         return new Customer(name.Trim(), email.Trim(), phone?.Trim(), billingAddress, shippingAddress, isActive);
+    }
+
+    public void SetCreatedAudit(DateTimeOffset timestamp, Guid? actorId)
+    {
+        CreatedAt = timestamp;
+        CreatedBy = actorId;
+        UpdatedAt = timestamp;
+        UpdatedBy = actorId;
+    }
+
+    public void SetUpdatedAudit(DateTimeOffset timestamp, Guid? actorId)
+    {
+        UpdatedAt = timestamp;
+        UpdatedBy = actorId;
     }
 }

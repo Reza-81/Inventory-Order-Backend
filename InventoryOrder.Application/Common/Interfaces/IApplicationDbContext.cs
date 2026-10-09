@@ -15,6 +15,7 @@ public interface IApplicationDbContext
     IQueryable<InventoryTransaction> InventoryTransactions { get; }
     IQueryable<ApplicationUser> Users { get; }
     IQueryable<UserWarehouse> UserWarehouses { get; }
+    IQueryable<AuditLog> AuditLogs { get; }
 
     Task<Product?> FindProductByIdAsync(Guid productId, CancellationToken cancellationToken = default);
     Task<Product?> FindProductBySkuAsync(string sku, CancellationToken cancellationToken = default);
