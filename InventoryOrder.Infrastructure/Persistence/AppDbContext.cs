@@ -1,11 +1,12 @@
 using InventoryOrder.Domain.Entities;
+using InventoryOrder.Application.Common.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Cryptography;
 
 namespace InventoryOrder.Infrastructure.Persistence;
 
 public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
-    : DbContext(options)
+    : DbContext(options), IApplicationDbContext
 {
     public DbSet<Product> Products => Set<Product>();
     public DbSet<Warehouse> Warehouses => Set<Warehouse>();
@@ -17,6 +18,17 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<ShipmentLine> ShipmentLines => Set<ShipmentLine>();
     public DbSet<InventoryTransaction> InventoryTransactions =>
         Set<InventoryTransaction>();
+
+    IQueryable<Product> IApplicationDbContext.Products => Products;
+    IQueryable<Warehouse> IApplicationDbContext.Warehouses => Warehouses;
+    IQueryable<StockItem> IApplicationDbContext.StockItems => StockItems;
+    IQueryable<Customer> IApplicationDbContext.Customers => Customers;
+    IQueryable<SalesOrder> IApplicationDbContext.SalesOrders => SalesOrders;
+    IQueryable<SalesOrderLine> IApplicationDbContext.SalesOrderLines => SalesOrderLines;
+    IQueryable<Shipment> IApplicationDbContext.Shipments => Shipments;
+    IQueryable<ShipmentLine> IApplicationDbContext.ShipmentLines => ShipmentLines;
+    IQueryable<InventoryTransaction> IApplicationDbContext.InventoryTransactions => InventoryTransactions;
+    void IApplicationDbContext.Add<TEntity>(TEntity entity) => Add(entity);
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

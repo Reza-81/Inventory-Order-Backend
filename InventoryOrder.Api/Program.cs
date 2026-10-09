@@ -1,11 +1,16 @@
-using InventoryOrder.Infrastructure.Persistence;
-using Microsoft.EntityFrameworkCore;
+using InventoryOrder.Application;
+using InventoryOrder.Application.Features.Ping;
+using InventoryOrder.Infrastructure;
+using MediatR;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+
+builder.Services.AddApplication();
+builder.Services.AddInfrastructure(builder.Configuration);
 
 var mysqlConnectionString =
     builder.Configuration.GetConnectionString("MySql")
@@ -16,11 +21,6 @@ var redisConnectionString =
     builder.Configuration.GetConnectionString("Redis")
     ?? throw new InvalidOperationException(
         "ConnectionStrings:Redis is missing from configuration.");
-
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseMySql(
-        mysqlConnectionString,
-        ServerVersion.AutoDetect(mysqlConnectionString)));
 
 builder.Services
     .AddHealthChecks()
@@ -37,6 +37,18 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.MapGet("/ping", async (
+    string message,
+    ISender sender,
+    CancellationToken cancellationToken) =>
+{
+    var response = await sender.Send(
+        new PingQuery(message),
+        cancellationToken);
+
+    return Results.Ok(response);
+});
 
 var summaries = new[]
 {
