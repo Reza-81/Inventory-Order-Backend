@@ -4,4 +4,5 @@
   <Project Path="InventoryOrder.Domain/InventoryOrder.Domain.csproj" />
   <Project Path="InventoryOrder.Infrastructure/InventoryOrder.Infrastructure.csproj" />
   <Project Path="InventoryOrder.Domain.Tests/InventoryOrder.Domain.Tests.csproj" />
+  <Project Path="InventoryOrder.Infrastructure.Tests/InventoryOrder.Infrastructure.Tests.csproj" />
 </Solution>
