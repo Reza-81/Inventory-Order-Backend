@@ -4,6 +4,8 @@ An ASP.NET Core inventory and order service built with Clean Architecture, CQRS,
 
 ## Architecture
 
+![Inventory & Order Backend architecture diagram](diagram.svg)
+
 ```text
 HTTP API
    ↓
